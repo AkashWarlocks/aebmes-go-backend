@@ -2,6 +2,7 @@ package keys
 
 import (
 	"bufio"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -57,6 +58,36 @@ func ReadUserKeys() (*rsa.PrivateKey, *rsa.PublicKey, *rsa.PrivateKey, *rsa.Publ
 
 	return ownerPrivateKey, ownerPublicKey, userPrivateKey, userPublicKey, nil
 
+}
+
+func createUserKeys(userType string) {
+
+	userPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		fmt.Println(err.Error)
+		os.Exit(1)
+	}
+	// userPublicKey := &userPrivateKey.PublicKey
+
+	privKeyBytes := x509.MarshalPKCS1PrivateKey(userPrivateKey)
+	fmt.Println(privKeyBytes)
+	pemPrivateFile, err := os.Create(userType + "_private_key.pem")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	err = pem.Encode(pemPrivateFile, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: privKeyBytes,
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	// fmt.Println("Private Key :", string(priv_pem), "end")
+	// fmt.Println("Public key ", userPublicKey)
+	pemPrivateFile.Close()
 }
 
 func OwnerPrivateKey() *rsa.PrivateKey {

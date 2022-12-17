@@ -19,15 +19,20 @@ contract Aebmes {
 
     struct FILE_METADATA {
         bytes32 fileHash;
+        string cipherText;
     }
 
     mapping(address => OWNER_DATA) private ownerData;
     mapping(bytes32 => TRAPDOOR_REQUEST) private trapdoorList;
-    mapping(string => bytes32) private fileDataList;
+    mapping(bytes32 => FILE_METADATA) private fileHashMapping;
 
     // mapping(string => bytes32[]) private wordsMap;
 
-    function addData(string[] memory words, string memory fileHash) public {
+    function addData(
+        string[] memory words,
+        string memory fileHash,
+        string memory cipherText
+    ) public {
         OWNER_DATA storage owner_data = ownerData[msg.sender];
         if (owner_data.data_owner == address(0)) {
             owner_data.data_owner = msg.sender;
@@ -38,6 +43,13 @@ contract Aebmes {
             bytes32 wordHash = createHash(words[i]);
             owner_data.wordsMap[wordHash] = fileHash;
         }
+
+        bytes32 fileHashBytes = createHash(fileHash);
+
+        fileHashMapping[fileHashBytes] = FILE_METADATA(
+            fileHashBytes,
+            cipherText
+        );
     }
 
     function viewData(address owner, string memory word)
@@ -56,14 +68,13 @@ contract Aebmes {
     )
         public
         returns (
-            address,
-            string[] memory,
-            bytes32
+            string memory fileHash,
+            bytes32,
+            string memory fileCipherText
         )
     {
         string[] memory fileCipherTextData = new string[](words.length);
-        //string[] memory b = new string[](size);
-        fileCipherTextData[0] = "!";
+
         OWNER_DATA storage data = ownerData[dataOwner];
         uint64 latestIndex = 0;
         for (uint256 i = 0; i < words.length; i++) {
@@ -81,14 +92,52 @@ contract Aebmes {
             endTimestamp,
             msg.sender
         );
-
+        fileHash = fileCipherTextData[0];
         trapdoorList[trapdoorHash] = TRAPDOOR_REQUEST(
             msg.sender,
             dataOwner,
             trapdoorHash,
             endTimestamp
         );
-        return (data.data_owner, fileCipherTextData, trapdoorHash);
+        FILE_METADATA memory file_metda_data = fileHashMapping[
+            createHash(fileHash)
+        ];
+        fileCipherText = file_metda_data.cipherText;
+
+        return (fileHash, trapdoorHash, fileCipherText);
+    }
+
+    function verify_trapdoor(bytes32 trapdoorHash, address data_user)
+        public
+        view
+        returns (bool verified)
+    {
+        TRAPDOOR_REQUEST memory trapdoor_data = trapdoorList[trapdoorHash];
+
+        if (trapdoor_data.data_user != data_user) {
+            // Terminate Search and revert back token to user
+            verified = false;
+        } else {
+            verified = true;
+        }
+    }
+
+    function verify_result(
+        bytes32 trapdoorHash,
+        string memory fileHash,
+        address data_user
+    ) public view returns (bool verified) {
+        bytes32 fileHashNew = createHash(fileHash);
+        FILE_METADATA memory data = fileHashMapping[fileHashNew];
+        TRAPDOOR_REQUEST memory trapdoor_data = trapdoorList[trapdoorHash];
+
+        if (
+            trapdoor_data.data_user != data_user || data.fileHash != fileHashNew
+        ) {
+            verified = false;
+        } else {
+            verified = true;
+        }
     }
 
     // function viewTrapdoorRequest()
